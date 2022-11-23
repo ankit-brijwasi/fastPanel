@@ -55,7 +55,6 @@ class FastPanelUserCreate(BaseModel):
 
 class LoginRes(BaseModel):
     access_token: str
-    refresh_token: str
     user: FastPanelUser
 
     class Config:
