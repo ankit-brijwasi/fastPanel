@@ -1,5 +1,6 @@
-from fastapi import FastAPI
 import importlib
+
+from fastapi import FastAPI
 import uvicorn
 
 from fastpanel import settings, core
@@ -33,6 +34,7 @@ async def shutdown():
 
 
 app.include_router(core.routers.router, prefix="/fastpanel", tags=["fastPanel"])
+
 
 if __name__ == "__main__":
     uvicorn.run("main:app", reload=True, host="127.0.0.1", port=8000)
