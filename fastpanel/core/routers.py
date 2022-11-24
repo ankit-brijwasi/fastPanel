@@ -5,13 +5,17 @@ from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
+
 from motor.core import Collection
+from pymongo import ReturnDocument
+
 import bcrypt
 
 from .schemas import FastPanelUser, LoginRes
 from ..utils.auth import create_access_token
 from ..utils import timezone
 from fastpanel import settings
+from fastpanel.utils.helpers import collect_models
 
 
 router = APIRouter()
@@ -28,15 +32,16 @@ def index(request: Request):
 
 @router.post("/login", response_model=LoginRes)
 async def login(req: Request, response: Response, form_data: OAuth2PasswordRequestForm = Depends()):
+    error =  exceptions.HTTPException(400, "Incorrect username or password")
+
     collection: Collection = req.app.db["fastpanelusers"]
-    user = await collection.find_one({"username": form_data.username})
-    if not user:
-        raise exceptions.HTTPException(400, "Incorrect username or password")
+    db_user = await collection.find_one({"username": form_data.username})
+    if not db_user: raise error
     
-    user = FastPanelUser(**user)
+    user = FastPanelUser(**db_user)
     if not bcrypt.checkpw(form_data.password.encode("utf-8"), user.password.encode("utf-8")):
-        raise exceptions.HTTPException(400, "Incorrect username or password")
-    
+        raise error
+
     if not user.is_active:
         raise exceptions.HTTPException(403, "This user is inactive")
 
@@ -51,5 +56,15 @@ async def login(req: Request, response: Response, form_data: OAuth2PasswordReque
         httponly=True,
         secure=True
     )
-    return {"access_token": access_token, "user": user}
+    db_user = await collection.find_one_and_update(
+        {"_id": user.id},
+        {"$set": {"last_login": timezone.now()}},
+        return_document=ReturnDocument.AFTER
+    )
+    return {"access_token": access_token, "user": FastPanelUser(**db_user)}
 
+
+@router.post("/fetch-models")
+async def fetch_models():
+    assert hasattr(settings, "CONFIG_FILE_PATH"), "config file is not present"
+    return collect_models(getattr(settings, "CONFIG_FILE_PATH"))
