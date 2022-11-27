@@ -1,37 +1,26 @@
 from datetime import datetime
-from typing import Optional
+from typing import Optional, List
 
 from bson import ObjectId
-from pydantic import BaseModel, EmailStr, Field
+from fastapi.exceptions import HTTPException
+from fastapi_pagination import Page
+from motor.core import Collection
+from pydantic import BaseModel, EmailStr, Field, validator
+from pymongo import errors
 
+from fastpanel.db.models import Model
 from fastpanel.utils import timezone
+from fastpanel.utils.auth import get_password_hash
 
 
-class PyObjectId(ObjectId):
-    @classmethod
-    def __get_validators__(cls):
-        yield cls.validate
-
-    @classmethod
-    def validate(cls, v):
-        if not ObjectId.is_valid(v):
-            raise ValueError("Invalid objectid")
-        return ObjectId(v)
-
-    @classmethod
-    def __modify_schema__(cls, field_schema):
-        field_schema.update(type="string")
-
-
-class FastPanelUser(BaseModel):
+class FastPanelUser(Model):
     """
     This model is used for authentication of users
     on fastPanel.
     """
 
-    id: PyObjectId = Field(default_factory=PyObjectId, alias="_id")
     username: str
-    password: str
+    password: str = Field(exclude=True)
     email: Optional[EmailStr]
     first_name: Optional[str]
     last_name: Optional[str]
@@ -39,10 +28,39 @@ class FastPanelUser(BaseModel):
     last_login: datetime = None
     is_active: bool = True
 
-    class Config:
-        allow_population_by_field_name = True
-        arbitrary_types_allowed = True
-        json_encoders = {ObjectId: str}
+    @validator("date_joined")
+    @classmethod
+    def set_date_joined(cls, date_joined):
+        return date_joined or timezone.now()
+
+    @validator("last_login")
+    @classmethod
+    def set_last_login(cls, last_login):
+        return last_login or None
+
+    @validator("is_active")
+    @classmethod
+    def set_is_active(cls, is_active):
+        if is_active == None:
+            return True
+        return is_active
+    
+    async def save(self, db) -> dict:
+        try:
+            collection: Collection = db[self.get_collection_name()]
+            added_obj = await collection.insert_one(
+                {
+                    **self.dict(),
+                    "password": get_password_hash(self.password)
+                }
+            )
+            fetch_obj = await collection.find_one({ "_id": added_obj.inserted_id })
+            return fetch_obj
+    
+        except errors.DuplicateKeyError as e:
+            raise HTTPException(400, e.details["errmsg"])
+        except Exception as e:
+            raise HTTPException(500, f"error: {e}")
 
 
 class FastPanelUserCreate(BaseModel):
@@ -55,7 +73,50 @@ class FastPanelUserCreate(BaseModel):
 
 class LoginRes(BaseModel):
     access_token: str
-    user: FastPanelUser
+    user: dict
+
+    class Config:
+        json_encoders = {ObjectId: str}
+
+
+class FetchModelRes(BaseModel):
+    class Model(BaseModel):
+        name: str
+        import_path: str
+
+    name: str
+    base_path: str
+    models: List[Model]
+
+
+class CustomPage(Page):
+    class Config:
+        json_encoders = {ObjectId: str}
+
+
+class CreateObject(BaseModel):
+    data: dict
+    app_name: str
+    model_name: str
+
+    class Config:
+        json_encoders = {ObjectId: str}
+
+
+class UpdateObject(BaseModel):
+    object_id: str
+    data: dict
+    app_name: str
+    model_name: str
+
+    class Config:
+        json_encoders = {ObjectId: str}
+
+
+class DeleteObject(BaseModel):
+    object_id: str
+    app_name: str
+    model_name: str
 
     class Config:
         json_encoders = {ObjectId: str}

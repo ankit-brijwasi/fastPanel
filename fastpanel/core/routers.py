@@ -1,21 +1,32 @@
 from datetime import timedelta
+from typing import Optional
 
-from fastapi import APIRouter, Depends, Request, Response, exceptions
+from bson.json_util import ObjectId
+from fastapi import APIRouter, Depends, Request, Response, exceptions, status
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
+from fastapi_pagination import Page, add_pagination, paginate
 
 from motor.core import Collection
 from pymongo import ReturnDocument
+from pymongo import errors
 
-import bcrypt
-
-from .schemas import FastPanelUser, LoginRes
-from ..utils.auth import create_access_token
+from .schemas import (
+    FastPanelUser,
+    LoginRes,
+    FetchModelRes,
+    CustomPage,
+    CreateObject,
+    UpdateObject,
+    DeleteObject
+)
+from ..utils.auth import create_access_token, verify_password
+from ..utils.helpers import get_model
 from ..utils import timezone
 from fastpanel import settings
-from fastpanel.utils.helpers import collect_models
+from fastpanel.utils.helpers import collect_models, get_app_models
 
 
 router = APIRouter()
@@ -37,13 +48,11 @@ async def login(req: Request, response: Response, form_data: OAuth2PasswordReque
     collection: Collection = req.app.db["fastpanelusers"]
     db_user = await collection.find_one({"username": form_data.username})
     if not db_user: raise error
-    
-    user = FastPanelUser(**db_user)
-    if not bcrypt.checkpw(form_data.password.encode("utf-8"), user.password.encode("utf-8")):
-        raise error
 
-    if not user.is_active:
-        raise exceptions.HTTPException(403, "This user is inactive")
+    user = FastPanelUser(**db_user)
+    if not verify_password(form_data.password, user.password): raise error
+
+    if not user.is_active: raise exceptions.HTTPException(403, "This user is inactive")
 
     expiry = timezone.now() + settings.JWT_CONF.get("ACCESS_TOKEN_EXPIRY", timedelta(minutes=15))
     access_token = create_access_token({"user_id": str(user.id)}, expiry)
@@ -64,7 +73,91 @@ async def login(req: Request, response: Response, form_data: OAuth2PasswordReque
     return {"access_token": access_token, "user": FastPanelUser(**db_user)}
 
 
-@router.post("/fetch-models")
-async def fetch_models():
-    assert hasattr(settings, "CONFIG_FILE_PATH"), "config file is not present"
-    return collect_models(getattr(settings, "CONFIG_FILE_PATH"))
+@router.get("/fetch-models", response_model=Page[FetchModelRes])
+async def fetch_models(app_name: Optional[str] = None):
+    models = collect_models(settings.CONFIG_FILE_PATH)
+    if app_name: models = get_app_models(app_name, models)
+    return paginate(models)
+
+
+@router.get("/models/objects/", response_model=CustomPage)
+async def list_objects(req: Request, app_name: str, model_name: str):
+    Model = get_model(app_name, model_name)
+    collection: Collection = req.app.db[Model.get_collection_name()]
+    cursor = collection.find().sort([('_id', 1)])
+
+    entries = [
+        Model(**entry) \
+        for entry in await cursor.to_list(int(req._query_params.get("size", "50")))
+    ]
+
+    return paginate(entries)
+
+
+@router.get("/models/objects/{object_id}")
+async def retrieve_object(req: Request, object_id: str, app_name: str, model_name: str):
+    Model = get_model(app_name, model_name)
+    collection: Collection = req.app.db[Model.get_collection_name()]
+
+    try:
+        db_obj = await collection.find_one({"_id": ObjectId(object_id)})
+    except Exception as e:
+        raise exceptions.HTTPException(500, f"error: {e}")
+    
+    if db_obj is None:
+        raise exceptions.HTTPException(404, "Object not found")
+    
+    del db_obj["id"]
+    db_obj["_id"] = str(db_obj["_id"])
+    return db_obj
+
+
+@router.post("/models/objects/", response_model=CreateObject)
+async def create_objects(req: Request, payload: CreateObject):
+    Model = get_model(payload.app_name, payload.model_name)
+    model_obj = Model(**payload.data)
+    saved_obj = await model_obj.save(req.app.db)
+    del saved_obj["id"]
+    return { **payload.dict(), "data": saved_obj }
+
+
+@router.patch("/models/objects/", response_model=UpdateObject)
+async def update_object(req: Request, payload: UpdateObject):
+    Model = get_model(payload.app_name, payload.model_name)
+    collection: Collection = req.app.db[Model.get_collection_name()]
+
+    try:
+        db_collection = await collection.find_one_and_update(
+            {"_id": ObjectId(payload.object_id)},
+            {"$set": payload.data},
+            return_document=ReturnDocument.AFTER
+        )
+    except errors.DuplicateKeyError as e:
+        raise exceptions.HTTPException(400, e.details["errmsg"])
+    except Exception as e:
+        raise exceptions.HTTPException(500, f"error: {e}")
+
+    if db_collection is None:
+        raise exceptions.HTTPException(404, "Object not found")
+
+    del db_collection["id"]
+    return {**payload.dict(), "data": db_collection}
+
+
+@router.delete("/models/objects/", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_object(req: Request, payload: DeleteObject):
+    Model = get_model(payload.app_name, payload.model_name)
+    collection: Collection = req.app.db[Model.get_collection_name()]
+
+    try:
+        db_collection = await collection.find_one_and_delete({
+            "_id": ObjectId(payload.object_id)
+        })
+    except Exception as e:
+        raise exceptions.HTTPException(500, f"error: {e}")
+
+    if db_collection is None:
+        raise exceptions.HTTPException(404, "Object not found")
+
+
+add_pagination(router)

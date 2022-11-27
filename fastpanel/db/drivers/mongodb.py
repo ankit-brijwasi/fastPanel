@@ -27,7 +27,17 @@ class Driver(db.BaseDriver):
 
     async def initialize_models(self, db):  
         models_available = await db.list_collection_names()
-        for inbuilt_model in self.inbuilt_models:
-            if inbuilt_model not in models_available:
-                logger.warning(f"{inbuilt_model} was not found! Creating it...")
-                await db.create_collection(inbuilt_model)
+        for key, value in self.inbuilt_models.items():
+            if key not in models_available:
+                kwargs = {}
+                logger.warning(f"{key} was not found! Creating it...")
+
+                if "$jsonSchema" in value.keys():
+                    kwargs["validator"] = {"$jsonSchema": value["$jsonSchema"]}
+
+                await db.create_collection(key, **kwargs)
+
+                if "indexes" in value.keys():
+                    for index in value["indexes"]:
+                        await db[key].create_index(**index)
+
