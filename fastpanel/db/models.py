@@ -44,8 +44,7 @@ class Model(BaseModel):
 
     class Config:
         allow_population_by_field_name = True
-        # arbitrary_types_allowed = True
         json_encoders = {ObjectId: str}
-        # validate_assignment = True
-
-model = Model
+    
+    class Meta:
+        allowed_operations = ["get", "post", "update", "delete"]

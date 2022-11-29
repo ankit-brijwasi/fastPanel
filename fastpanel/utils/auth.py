@@ -2,12 +2,15 @@ from datetime import datetime
 
 from jose import jwt
 from jose.exceptions import JWTError, JWTClaimsError, ExpiredSignatureError
-from fastapi import exceptions
+from fastapi import exceptions, Depends
+from fastapi.security import OAuth2PasswordBearer
 from passlib.context import CryptContext
 
 from fastpanel import settings
+from fastpanel.utils import timezone
 
 
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login")
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 
@@ -36,3 +39,13 @@ def decode_access_token(token: str):
             headers={"WWW-Authenticate": "Bearer"}
         )
     return payload
+
+
+async def auth_required(token: str = Depends(oauth2_scheme)):
+    payload = decode_access_token(token)
+    return payload
+
+
+async def logged_in_user(payload: dict = Depends(auth_required)):
+    print(payload)
+    return {"hello"}
