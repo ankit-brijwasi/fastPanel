@@ -45,6 +45,16 @@ class Model(BaseModel):
     class Config:
         allow_population_by_field_name = True
         json_encoders = {ObjectId: str}
-    
+
     class Meta:
-        allowed_operations = ["get", "post", "update", "delete"]
+        def __init__(
+            self,
+            allowed_operations: str = ["get", "post", "update", "delete"],
+            search_fields = ["_id"],
+            filter_fields = []
+        ) -> None:
+            self.allowed_operations = allowed_operations
+            self.search_fields = search_fields
+            self.filter_fields = filter_fields
+
+    _meta = Meta()

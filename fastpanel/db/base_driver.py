@@ -60,33 +60,9 @@ class BaseDriver(ABC):
                     },
                     {
                         "keys": "email",
-                        "unique": True
+                        "unique": True,
+                        "partialFilterExpression": {"email": {"$type": "string"}}
                     }
-                ]
-            },
-            "fastpanelactivities": {
-                "$jsonSchema": {
-                    "bsonType": "object",
-                    "title": "FastPanelActivities object Validation",
-                    "required": ["fastpaneluser_id", "message", "created_at"],
-                    "properties": {
-                        "fastpaneluser_id": {
-                            "bsonType": "objectId",
-                            "description": "'fastpaneluser_id' must be a objectId and is required"
-                        },
-                        "message": {
-                            "bsonType": "object",
-                            "description": "'message' must be an object and is required"
-                        },
-                        "created_at": {
-                            "bsonType": ["date", "null"],
-                            "description": "'created_at' must be a date"
-                        }
-                    }
-                },
-                "indexes": [
-                    {"keys": "fastpaneluser_id"},
-                    {"keys": "message"},
                 ]
             }
         }

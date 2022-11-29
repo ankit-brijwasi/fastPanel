@@ -6,7 +6,7 @@ from motor.core import Collection
 from pydantic import EmailStr, Field, validator
 from pymongo import errors
 
-from fastpanel.db.models import Model, PyObjectIdField
+from fastpanel.db.models import Model
 from fastpanel.utils import timezone
 from fastpanel.utils.auth import get_password_hash
 
@@ -60,17 +60,17 @@ class FastPanelUser(Model):
         except Exception as e:
             raise HTTPException(500, f"error: {e}")
 
-
-class FastPanelActivity(Model):
-    fastpaneluser_id: PyObjectIdField = Field(default_factory=PyObjectIdField)
-    message: dict
-    created_at: datetime = timezone.now()
-
-    @validator("created_at")
-    @classmethod
-    def set_date_joined(cls, date_joined):
-        return date_joined or timezone.now()
-
-    class Meta:
-        allowed_operations = ["get"]
-
+    _meta = Model.Meta(
+        search_fields=[
+            "_id",
+            "username",
+            "email",
+            "first_name",
+            "last_name",
+            "date_joined",
+            "last_login"
+        ],
+        filter_fields=[
+            {"field_name": "is_active", "type": "bool"}
+        ]
+    )

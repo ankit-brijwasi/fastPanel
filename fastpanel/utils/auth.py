@@ -1,13 +1,14 @@
 from datetime import datetime
 
+from bson import ObjectId
+from fastapi import exceptions, Depends, Request
+from fastapi.security import OAuth2PasswordBearer
 from jose import jwt
 from jose.exceptions import JWTError, JWTClaimsError, ExpiredSignatureError
-from fastapi import exceptions, Depends
-from fastapi.security import OAuth2PasswordBearer
+from motor.core import Collection
 from passlib.context import CryptContext
 
 from fastpanel import settings
-from fastpanel.utils import timezone
 
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login")
@@ -46,6 +47,10 @@ async def auth_required(token: str = Depends(oauth2_scheme)):
     return payload
 
 
-async def logged_in_user(payload: dict = Depends(auth_required)):
-    print(payload)
-    return {"hello"}
+async def logged_in_user(req: Request, payload: dict = Depends(auth_required)):
+    from fastpanel.core.models import FastPanelUser
+    collection: Collection = req.app.db["fastpanelusers"]
+    fetched_user = await collection.find_one({"_id": ObjectId(payload["user_id"])})
+    user = FastPanelUser(**fetched_user)
+    if not user.is_active: raise exceptions.HTTPException(403, "User is inactive")
+    return user

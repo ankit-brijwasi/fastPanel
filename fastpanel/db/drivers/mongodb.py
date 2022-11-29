@@ -39,5 +39,5 @@ class Driver(db.BaseDriver):
 
                 if "indexes" in value.keys():
                     for index in value["indexes"]:
+                        print(index)
                         await db[key].create_index(**index)
-

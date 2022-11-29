@@ -62,3 +62,13 @@ class DeleteObject(BaseModel):
 
     class Config:
         json_encoders = {ObjectId: str}
+
+
+class SearchObject(BaseModel):
+    app_name: str
+    model_name: str
+    data: dict
+
+    class Config:
+        json_encoders = {ObjectId: str}
+
