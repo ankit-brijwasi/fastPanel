@@ -1,10 +1,18 @@
 import importlib
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from fastpanel import settings, core
 
 
 app = FastAPI()
 
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"]
+)
 
 async def init_fastpanel(config_file: str):
     setattr(settings, "CONFIG_FILE_PATH", config_file)
