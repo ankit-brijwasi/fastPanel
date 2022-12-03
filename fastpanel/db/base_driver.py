@@ -1,7 +1,7 @@
 from abc import ABC, abstractclassmethod
 from typing import Tuple
 
-import pymongo
+from fastpanel import settings
 
 
 class BaseDriver(ABC):
@@ -67,9 +67,13 @@ class BaseDriver(ABC):
             }
         }
 
-    @abstractclassmethod
-    def construct_db_url(self) -> str:
-        pass
+    @classmethod
+    def construct_db_url(self):
+        return "mongodb+srv://{}:{}@{}/?retryWrites=true&w=majority".format(
+            settings.DATABASE['user'],
+            settings.DATABASE['password'],
+            settings.DATABASE['host']
+        )
 
     @abstractclassmethod
     def connect(self) -> Tuple:
