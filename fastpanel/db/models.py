@@ -45,6 +45,7 @@ class Model(BaseModel):
     class Config:
         allow_population_by_field_name = True
         json_encoders = {ObjectId: str}
+        arbitrary_types_allowed = True
 
     class Meta:
         def __init__(
