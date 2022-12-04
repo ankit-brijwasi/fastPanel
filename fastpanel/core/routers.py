@@ -87,6 +87,28 @@ async def list_objects(req: Request, app_name: str, model_name: str, _ = Depends
     return paginate(entries)
 
 
+@router.get("/models/objects/attributes")
+async def model_attributes(app_name: str, model_name: str, _ = Depends(auth_required)):
+    Model: models.Model = get_model(app_name, model_name)
+    if "get" not in Model._meta.allowed_operations:
+        raise exceptions.HTTPException(status.HTTP_403_FORBIDDEN, "Permission denied")
+    
+    fields = []
+    for key, value in Model.__fields__.items():
+        fields.append(
+            {
+                key: {
+                    "type": str(value.type_),
+                    "required": value.required,
+                    "default": value.default,
+                    "connected_with": value.field_info.extra.get("connected_with")
+                }
+            }
+        )
+    
+    return fields
+
+
 @router.get("/models/objects/{object_id}")
 async def retrieve_object(req: Request, object_id: str, app_name: str, model_name: str, _ = Depends(auth_required),):
     Model: models.Model = get_model(app_name, model_name)
@@ -104,7 +126,7 @@ async def retrieve_object(req: Request, object_id: str, app_name: str, model_nam
     
     del db_obj["id"]
     db_obj["_id"] = str(db_obj["_id"])
-    return db_obj
+    return Model(**db_obj)
 
 
 @router.post("/models/objects/", response_model=CreateObject)
