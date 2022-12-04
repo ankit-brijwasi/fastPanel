@@ -98,7 +98,7 @@ async def model_attributes(app_name: str, model_name: str, _ = Depends(auth_requ
         fields.append(
             {
                 key: {
-                    "type": str(value.type_),
+                    "type": str(value.type_).split("'")[1].split(".")[-1],
                     "required": value.required,
                     "default": value.default,
                     "connected_with": value.field_info.extra.get("connected_with")
