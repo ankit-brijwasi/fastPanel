@@ -95,10 +95,15 @@ async def model_attributes(app_name: str, model_name: str, _ = Depends(auth_requ
     
     fields = []
     for key, value in Model.__fields__.items():
+        try:
+            field_type = str(value.type_).split("'")[1]
+        except IndexError:
+            field_type = str(value.type_)
+
         fields.append(
             {
                 key: {
-                    "type": str(value.type_).split("'")[1].split(".")[-1],
+                    "type": field_type.split(".")[-1],
                     "required": value.required,
                     "default": value.default,
                     "connected_with": value.field_info.extra.get("connected_with")
