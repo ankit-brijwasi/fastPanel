@@ -2,6 +2,7 @@ import importlib
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastpanel import settings, core
+from fastpanel.core.models import Model
 
 
 app = FastAPI()
@@ -24,10 +25,11 @@ async def init_fastpanel(config_file: str):
 
     if not isinstance(client, type(None)):
         setattr(app, "client", client)
+        setattr(Model, "_mongo_client", client)
     if not isinstance(db, type(None)):
         setattr(app, "db", db)
-    
-    
+        setattr(Model, "_mongo_db", db)
+
 
 async def deinit_fastpanel():
     driver_module = importlib.import_module(settings.DATABASE["driver"])
