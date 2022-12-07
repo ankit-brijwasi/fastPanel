@@ -92,7 +92,7 @@ async def model_attributes(app_name: str, model_name: str, _ = Depends(auth_requ
     Model: models.Model = get_model(app_name, model_name)
     if "get" not in Model._meta.allowed_operations:
         raise exceptions.HTTPException(status.HTTP_403_FORBIDDEN, "Permission denied")
-    
+
     fields = []
     for key, value in Model.__fields__.items():
         try:
@@ -106,7 +106,8 @@ async def model_attributes(app_name: str, model_name: str, _ = Depends(auth_requ
                     "type": field_type.split(".")[-1],
                     "required": value.required,
                     "default": value.default,
-                    "connected_with": value.field_info.extra.get("connected_with")
+                    "connected_with": value.field_info.extra.get("connected_with"),
+                    "editable": value.field_info.extra.get("editable", True),
                 }
             }
         )

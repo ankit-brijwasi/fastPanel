@@ -22,8 +22,8 @@ class FastPanelUser(Model):
     email: Optional[EmailStr]
     first_name: Optional[str]
     last_name: Optional[str]
-    date_joined: datetime = timezone.now()
-    last_login: datetime = None
+    date_joined: datetime = Field(default=timezone.now(), editable=False)
+    last_login: datetime = Field(default=None, editable=False)
     is_active: bool = True
 
     @validator("date_joined")
