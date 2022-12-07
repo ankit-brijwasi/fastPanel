@@ -11,7 +11,6 @@ class EventCreate(BaseModel):
     name: str
     level: int
     language: str
-    created_on: datetime
     admin_user: PyObjectIdField
 
 
