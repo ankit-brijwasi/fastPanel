@@ -1,6 +1,9 @@
 # fastPanel
 A Django inspired admin panel for FARM stack developers, to make there development life easy!
 
+# System requirements
+Due to the limited support of the uvloop package in windows, the server might not start, to fix this, use the server in WSL
+
 # Run the server
 1. Activate your virtualenv
 2. Install all the dependencies using, `pip install -r requirements.txt`
