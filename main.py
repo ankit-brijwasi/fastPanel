@@ -1,4 +1,5 @@
 from fastapi import FastAPI
+from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 
 from fastpanel.db.drivers import Driver
@@ -32,7 +33,6 @@ async def shutdown():
 
 # mounted fastpanel
 app.mount("/fastpanel", connector.app)
-
-
-# internal routes
 app.include_router(router, tags=["DevDuels"])
+
+app.mount("/", StaticFiles(directory="preact-app/", html=True), name="preact-app")

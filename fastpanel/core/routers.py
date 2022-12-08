@@ -4,9 +4,6 @@ from typing import Optional
 from bson.json_util import ObjectId
 from fastapi import APIRouter, Depends, Request, exceptions, status
 from fastapi.security import OAuth2PasswordRequestForm
-from fastapi.staticfiles import StaticFiles
-from fastapi.responses import HTMLResponse
-from fastapi.templating import Jinja2Templates
 from fastapi_pagination import Page, add_pagination, paginate
 
 from motor.core import Collection
@@ -32,12 +29,11 @@ from fastpanel.utils.helpers import collect_models, get_app_models
 
 
 router = APIRouter()
-router.mount("/static", StaticFiles(directory="static"), name="static")
-templates = Jinja2Templates(directory="templates")
+# templates = Jinja2Templates(directory="templates")
 
-@router.get("/", response_class=HTMLResponse)
-def index(request: Request):
-    return templates.TemplateResponse("index.html", {"request": request})
+# @router.get("/", response_class=HTMLResponse)
+# def index(request: Request):
+#     return templates.TemplateResponse("index.html", {"request": request})
 
 
 @router.post("/login", response_model=LoginRes)
