@@ -26,7 +26,7 @@ class User(models.Model):
 class Question(models.Model):
     statement: str
     level: int = Field(default=0)
-    language: str = Field(default="python")
+    language: str = Field(default="python3")
     expected_output: Any
 
     @validator("level")
@@ -39,7 +39,7 @@ class Question(models.Model):
     @validator("language")
     @classmethod
     def validate_language(cls, language):
-        if language not in ("python", "nodejs", "c", "go", "cpp"):
+        if language not in ("python3", "nodejs", "c", "go", "cpp"):
             raise HTTPException(400, f"language: {language} not supported right now")
         return language
 
@@ -47,7 +47,7 @@ class Question(models.Model):
 class Event(models.Model):
     name: str
     level: int
-    language: str = Field(default="python")
+    language: str = Field(default="python3")
     created_on: datetime = Field(default=timezone.now(), editable=False)
     question_assigned: Optional[models.PyObjectIdField] = Field(connected_with="devduels.Question")
     admin_user: models.PyObjectIdField = Field(connected_with="devduels.User")
@@ -63,7 +63,7 @@ class Event(models.Model):
     @validator("language")
     @classmethod
     def validate_language(cls, language):
-        if language not in ("python", "nodejs", "c", "go", "cpp"):
+        if language not in ("python3", "nodejs", "c", "go", "cpp"):
             raise HTTPException(400, f"language: {language} not supported right now")
         return language
 
@@ -74,8 +74,8 @@ class Participant(models.Model):
         output: Any
         output_time: str
 
-    user: models.PyObjectIdField
-    event: models.PyObjectIdField
+    user: models.PyObjectIdField = Field(connected_with="devduels.User")
+    event: models.PyObjectIdField = Field(connected_with="devduels.Event")
     is_ready: bool = Field(default=False)
     solution: Optional[Solution]
     time_taken: Optional[str]
