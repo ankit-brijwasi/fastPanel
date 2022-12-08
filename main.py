@@ -35,4 +35,4 @@ async def shutdown():
 app.mount("/fastpanel", connector.app)
 app.include_router(router, tags=["DevDuels"])
 
-app.mount("/", StaticFiles(directory="preact-app/", html=True), name="preact-app")
+app.mount("/", StaticFiles(directory="preact-app/fast-panel", html=True), name="preact-app")
