@@ -1,18 +1,18 @@
+# PENDING IS HANDLING CORRECT MESSAGES ON THE CLIENT SIDE
+
 import json
 
 from bson import ObjectId
-from fastapi import APIRouter, Request, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, Request, WebSocket
 from fastapi.exceptions import HTTPException
 from fastapi_pagination import paginate, add_pagination
-from pymongo import ReturnDocument
-from websockets.exceptions import ConnectionClosedError
+from pymongo import ReturnDocument, DESCENDING
 import motor.motor_asyncio as motor
 import requests
 
 from fastpanel.core.schemas import CustomPage
+from fastpanel.core.serializers import FastPanelJSONEncoder
 from fastpanel.utils import timezone
-
-from .utils import ConnectionManager
 from . import models, schemas
 
 router = APIRouter()
@@ -27,7 +27,9 @@ async def create_user(req: Request, user: schemas.UserCreate):
 @router.get("/events/list", response_model=CustomPage)
 async def list_event(req: Request):
     collection: motor.core.Collection = req.app.db[models.Event.get_collection_name()]
-    cursor: motor.AsyncIOMotorCursor = collection.find().sort([('_id', 1)])
+    cursor: motor.AsyncIOMotorCursor = collection.find().sort([
+        ('_id', DESCENDING)
+    ])
 
     entries = [
         await models.Event(**entry).transform_data([
@@ -71,7 +73,7 @@ async def retrieve_event(id: str, req: Request):
 
 @router.post("/events/create")
 async def create_event(req: Request, payload: schemas.EventCreate):
-    obj = await models.Event(**payload.dict()).save(req.app.db)
+    obj = await models.Event(**payload.dict(), created_on=timezone.now()).save(req.app.db)
     return await models.Event(**obj).transform_data([
         {
             "field_name": "admin_user",
@@ -82,6 +84,8 @@ async def create_event(req: Request, payload: schemas.EventCreate):
 
 @router.post("/participants/submit-solution")
 async def submit_solution(payload: schemas.SubmitSolution, req: Request):
+    from dateutil import parser
+
     collection: motor.core.Collection = req.app.db[models.Participant.get_collection_name()]
     participant = await collection.find_one({"_id": ObjectId(payload.participant_id)})
 
@@ -90,7 +94,7 @@ async def submit_solution(payload: schemas.SubmitSolution, req: Request):
 
     evt_coll: motor.core.Collection = req.app.db[models.Event.get_collection_name()]
     evt = await evt_coll.find_one({"_id": participant.get("event")})
-    
+
     response = requests.post(
         "https://api.jdoodle.com/v1/execute",
         json={
@@ -115,7 +119,7 @@ async def submit_solution(payload: schemas.SubmitSolution, req: Request):
                     "output": response["output"],
                     "output_time": response["cpuTime"]
                 },
-                "time_taken": payload.proposed_answer.time_taken
+                "time_taken": str(parser.parse(payload.proposed_answer.ended_on) - parser.parse(payload.proposed_answer.started_on))
             }
         },
         return_document=ReturnDocument.AFTER
@@ -239,7 +243,9 @@ async def ready(id: str, req: Request):
 @router.get("/events/{id}/participants")
 async def event_participants(id: str, req: Request):
     collection: motor.core.Collection = req.app.db[models.Participant.get_collection_name()]
-    participants = await collection.find({ "event": ObjectId(id) }).to_list(None)
+    participants = await collection.find({ "event": ObjectId(id) }).sort([
+        ('_id', DESCENDING)
+    ]).to_list(None)
 
     participants = [
         await models.Participant(**participant).transform_data(
@@ -261,8 +267,7 @@ async def event_participants(id: str, req: Request):
 
 @router.websocket("/ws/watch")
 async def watch(websocket: WebSocket):
-    manager = ConnectionManager()
-    await manager.connect(websocket)
+    await websocket.accept()
     db: motor.core.Database = websocket.app.db
     pipeline = [
         {
@@ -277,10 +282,60 @@ async def watch(websocket: WebSocket):
     try:
         async with db.watch(pipeline) as change_stream:
             async for change in change_stream:
-                await manager.broadcast(change)
+                data = {}
+                if change["operationType"] == "insert":
+                    data["operationType"] = "insert"
 
-    except (WebSocketDisconnect, ConnectionClosedError):
-        manager.disconnect(websocket)
+                    if change["ns"]["coll"] == "events":
+                        data["coll"] = "events"
+                        data['document'] = await models.Event(**change["fullDocument"]).transform_data(
+                            [
+                                {
+                                    "field_name": "question_assigned",
+                                    "model": models.Question
+                                },
+                                {
+                                    "field_name": "admin_user",
+                                    "model": models.User
+                                }
+                            ]
+                        )
+                    elif change["ns"]["coll"] == "participants":
+                        data["coll"] = "participants"
+                        data['document'] = await models.Participant(**change["fullDocument"]).transform_data(
+                            [
+                                {
+                                    "field_name": "user",
+                                    "model": models.User
+                                },
+                                {
+                                    "field_name": "event",
+                                    "model": models.Event
+                                }
+                            ]
+                        )
+
+                elif change["operationType"] == "update":
+                    data["operationType"] = "update"
+
+                    if change["ns"]["coll"] == "events":
+                        data["coll"] = "events"
+                        data['document'] = {
+                            **change["documentKey"],
+                            **change["updateDescription"]["updatedFields"]
+                        }
+
+                    elif change["ns"]["coll"] == "participants":
+                        data["coll"] = "participants"
+                        data['document'] = {
+                            **change["documentKey"],
+                            **change["updateDescription"]["updatedFields"]
+                        }
+
+                await websocket.send_text(json.dumps(data, cls=FastPanelJSONEncoder))
+
+    except Exception as e:
+        await websocket.close()
 
 
 add_pagination(router)

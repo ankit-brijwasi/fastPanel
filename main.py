@@ -1,6 +1,5 @@
-import logging
-
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
 from fastpanel.db.drivers import Driver
 from fastpanel import connector
@@ -9,8 +8,13 @@ from devduels.routers import router
 
 
 app = FastAPI()
-logger = logging.getLogger()
-process = None
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"]
+)
 
 
 @app.on_event("startup")

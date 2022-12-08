@@ -17,7 +17,8 @@ class EventCreate(BaseModel):
 class SubmitSolution(BaseModel):
     class ProposedAnswer(BaseModel):
         script: str
-        time_taken: str
+        started_on: str
+        ended_on: str
 
     participant_id: str
     proposed_answer: ProposedAnswer
