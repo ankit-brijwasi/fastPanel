@@ -1,0 +1,3 @@
+[submodule "preact-app"]
+	path = preact-app
+	url = https://github.com/navdeepm20/fast-pannel
