@@ -6,8 +6,10 @@ Due to the limited support of the uvloop package in windows, the server might no
 
 # How to use
 For now, user registration is off, A fastpanel user can only be added via the admin panel itself, and to do that use-
-username: `tester`
-password: `TestUser123`
+
+|username|`tester`|
+|---|---|
+|password|`TestUser123`|
 
 # Run the server
 1. Activate your virtualenv
