@@ -4,7 +4,7 @@ A Django inspired admin panel for FARM stack developers, to make there developme
 # System requirements
 Due to the limited support of the uvloop package in windows, the server might not start, to fix this, use the server in WSL
 
-# Defaukt User
+# Default User
 For now, user registration is off, A fastpanel user can only be added via the admin panel itself, and to do that use-
 
 |username|`tester`|
