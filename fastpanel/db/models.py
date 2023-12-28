@@ -74,8 +74,7 @@ class Model(ABC, BaseModel, metaclass=MetaModel):
     def _get_bson_properties(cls, properties: dict):
         return {
             field: cls._construct_field_info(field, value) \
-            for field, value in properties.items() \
-            if not field == "_id"
+            for field, value in properties.items()
         }
 
     @classmethod
