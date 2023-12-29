@@ -1,11 +1,10 @@
 from abc import ABC
 
-from bson import ObjectId
 from pydantic import BaseModel, ConfigDict, Field
 from pydantic._internal._model_construction import ModelMetaclass
 from motor.motor_asyncio import AsyncIOMotorCollection
 
-from .fields import PyObjectIdField
+from .fields import PyObjectIdField, ObjectId
 
 
 class MetaOptions:
@@ -18,6 +17,7 @@ class MetaOptions:
         indexes=None,
         refer_to= "Self",
         hidden_fields=None,
+        is_nested=False,
         **options
     ):
         self.parent = parent
@@ -27,9 +27,10 @@ class MetaOptions:
         self.refer_to = refer_to or "Self"
         self.hidden_fields = hidden_fields or []
         self.search_fields = search_fields or ["_id"]
+        self.is_nested = is_nested
     
     def __repr__(self) -> str:
-        return "<MetaOptions parent='%s'>" % (self.parent)
+        return "<MetaOptions parent='%s' is_nested='%s'>" % (self.parent, self.is_nested)
 
 
 class MetaModel(ModelMetaclass):
@@ -59,16 +60,30 @@ class Model(ABC, BaseModel, metaclass=MetaModel):
 
     @classmethod
     def _construct_field_info(cls, field_name, value):
-        desc = "'%s' must be an '%s'" % (field_name, value["bsonType"])
+        desc = "'%s' must be an %s" % (field_name, value["bsonType"])
         if "description" in value: desc = value["description"]
 
-        if value["bsonType"] in ["object", "array"]:
-            return dict(
-                bsonType=value["bsonType"],
-                properties=value["properties"],
-                description=desc
-            )
-        return dict(bsonType=value["bsonType"], description=desc)
+        field_info = dict(bsonType=value["bsonType"], description=desc, title=value.get("title", "N/A"))
+
+        if value["bsonType"] == "object":
+            field_info = {
+                **field_info,
+                "bsonType": "object",
+                "properties": value["properties"]
+            }
+            if "required" in value and len(value["required"]) > 0:
+                field_info["required"] = value["required"]
+
+        if value["bsonType"] == "array":
+            field_info = {
+                **field_info,
+                "bsonType": "array",
+                "items": value["items"]
+            }
+            if "required" in value and len(value["required"]) > 0:
+                field_info["required"] = value["required"]
+
+        return field_info
 
     @classmethod
     def _get_bson_properties(cls, properties: dict):
@@ -114,19 +129,21 @@ class Model(ABC, BaseModel, metaclass=MetaModel):
         if not settings.SETTINGS_LOADED: raise SettingsNotLoaded
         return cls._conn[settings.DATABASE.get("name")][cls.get_collection_name()]
 
-    def model_dump_json(self, dump_all: bool = False, *args, **kwargs) -> str:
-        excluded_fields = kwargs.pop("exclude", []) or []
-        if dump_all: excluded_fields = None
-        else: excluded_fields.extend(self._meta.hidden_fields)
-        return super().model_dump_json(*args, **kwargs, exclude=excluded_fields)
+    def _get_excluded_fields(self, dump_all, fields):
+        if dump_all: return None
+        excluded_fields = fields.pop("exclude", []) or []
+        excluded_fields.extend(self._meta.hidden_fields)
+        return excluded_fields
 
-    def model_dump(self, dump_all: bool = False, *args, **kwargs) -> str:
-        excluded_fields = kwargs.pop("exclude", []) or []
-        if dump_all: excluded_fields = None
-        else: excluded_fields.extend(self._meta.hidden_fields)
-        return super().model_dump(*args, **kwargs, exclude=excluded_fields)
+    def model_dump_json(self, dump_all: bool = False, by_alias: bool = True, *args, **kwargs) -> str:
+        excluded_fields = self._get_excluded_fields(dump_all, kwargs)
+        return super().model_dump_json(by_alias=by_alias, *args, **kwargs, exclude=excluded_fields)
 
-    model_config = ConfigDict(arbitrary_types_allowed=True, populate_by_name=True)
+    def model_dump(self, dump_all: bool = False, by_alias: bool = True, *args, **kwargs) -> str:
+        excluded_fields = self._get_excluded_fields(dump_all, kwargs)
+        return super().model_dump(by_alias=by_alias, *args, **kwargs, exclude=excluded_fields)
+
+    model_config = ConfigDict(arbitrary_types_allowed=True, populate_by_name=True, json_encoders={ObjectId: str})
 
     def __str__(self) -> str:
         return f"<{self.get_model_name()} id='{self.id}'>"

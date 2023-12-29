@@ -72,9 +72,9 @@ class Setup:
             req_model
             for app in settings.INSTALLED_APPS
             for req_model in app.models
-            if req_model.get_collection_name() not in models_available
+            if not req_model._meta.default.is_nested and \
+               not req_model.get_collection_name() in models_available
         ]
-
 
         for model in missing_models:
             print(f"installing {model.get_collection_name()} model...")

@@ -2,11 +2,10 @@ from typing import Any, Literal
 
 from bson import ObjectId
 from pydantic_core import core_schema
-from typing_extensions import Annotated
-
 from pydantic import GetJsonSchemaHandler, Field
 from pydantic.json_schema import JsonSchemaValue
-    
+from typing_extensions import Annotated
+
 
 class _ObjectIdPydanticAnnotation:
     @classmethod
@@ -37,28 +36,29 @@ PyObjectIdField = Annotated[ObjectId, _ObjectIdPydanticAnnotation]
 
 def EmbdedField(
         related_to,
-        embeding_type: Literal['one-to-one', 'many-to-one'] = "one-to-one",
+        embeding_type: Literal['one-to-many', 'many-to-many'] = "one-to-many",
         *args,
         **kwargs
     ):
     """
     Use this field to embed a document of another collection into this collection.
     :param related_to: The model with which this field is being embded to
-    :param embeding_type: one-to-one or many-to-many
+    :param embeding_type: one-to-many or many-to-many
     """
-    if embeding_type == "one-to-one":
-        _, schema = related_to.get_bson_schema()
-    elif embeding_type == "many-to-many":
-        schema = {}
-    else:
+    if not embeding_type in ["one-to-many", "many-to-many"]:
         raise ValueError("Invalid value for '%s' passed" % (embeding_type))
 
-    return Field(
-        *args,
-        **kwargs,
-        json_schema_extra=schema.get("$jsonSchema")
-    )
+    schema: dict = related_to.get_bson_schema()[1]
 
+    if "required" in schema["$jsonSchema"] and len(schema["$jsonSchema"].get("required")) > 0:
+        schema["$jsonSchema"]["required"].append("_id")
 
-# def RefrencedField(related_to, related_via: str, *args, **kwargs):
-#     return Field(*args, **kwargs)
+    if embeding_type == "many-to-many":
+        schema = {
+            "bsonType": "array",
+            "items": schema["$jsonSchema"],
+            "relation_type": "embeded"
+        }
+        return Field(*args, **kwargs, json_schema_extra=schema)
+
+    return Field(*args, **kwargs, json_schema_extra={**schema, "relation_type": "embeded"})

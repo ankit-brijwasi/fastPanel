@@ -110,8 +110,6 @@ async def create_objects(
 
     try:
         dumped_data = model_obj.model_dump(dump_all=True)
-        dumped_data["_id"] = dumped_data["id"]
-        del dumped_data["id"]
         await collection.insert_one(dumped_data)
     except Exception as e:
         raise exceptions.HTTPException(
@@ -122,7 +120,7 @@ async def create_objects(
                 "code": e.code if hasattr(e, "code") else None
             }
         )
-    return model_obj
+    return model(**dumped_data)
 
 
 @router.patch("/models/objects/{object_id}", response_model=schemas.UpdateObject)
