@@ -66,7 +66,7 @@ async def model_attributes(
     if "get" not in Model._meta.default.allowed_operations:
         raise exceptions.HTTPException(status.HTTP_403_FORBIDDEN, "Permission denied")
 
-    return model.model_json_schema()
+    return model.dump_model_attributes()
 
 
 @router.get("/models/objects/{object_id}")

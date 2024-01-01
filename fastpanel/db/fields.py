@@ -35,7 +35,6 @@ PyObjectIdField = Annotated[ObjectId, _ObjectIdPydanticAnnotation]
 
 
 def EmbdedField(
-        related_to,
         embeding_type: Literal['one-to-many', 'many-to-many'] = "one-to-many",
         *args,
         **kwargs
@@ -48,17 +47,22 @@ def EmbdedField(
     if not embeding_type in ["one-to-many", "many-to-many"]:
         raise ValueError("Invalid value for '%s' passed" % (embeding_type))
 
-    schema: dict = related_to.get_bson_schema()[1]
-
-    if "required" in schema["$jsonSchema"] and len(schema["$jsonSchema"].get("required")) > 0:
-        schema["$jsonSchema"]["required"].append("_id")
-
     if embeding_type == "many-to-many":
-        schema = {
-            "bsonType": "array",
-            "items": schema["$jsonSchema"],
+        return Field(
+            *args,
+            **kwargs,
+            json_schema_extra={
+                "bsonType": "array",
+                "relation_type": "embeded"
+            }
+        )
+
+    return Field(
+        *args,
+        **kwargs,
+        json_schema_extra={
+            "bsonType": "object",
             "relation_type": "embeded"
         }
-        return Field(*args, **kwargs, json_schema_extra=schema)
+    )
 
-    return Field(*args, **kwargs, json_schema_extra={**schema, "relation_type": "embeded"})

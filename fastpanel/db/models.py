@@ -1,5 +1,6 @@
 from abc import ABC
 
+import jsonschema
 from pydantic import BaseModel, ConfigDict, Field
 from pydantic._internal._model_construction import ModelMetaclass
 from motor.motor_asyncio import AsyncIOMotorCollection
@@ -59,59 +60,86 @@ class Model(ABC, BaseModel, metaclass=MetaModel):
     )
 
     @classmethod
-    def _construct_field_info(cls, field_name, value):
-        desc = "'%s' must be an %s" % (field_name, value["bsonType"])
-        if "description" in value: desc = value["description"]
-
-        field_info = dict(bsonType=value["bsonType"], description=desc, title=value.get("title", "N/A"))
-
-        if value["bsonType"] == "object":
-            field_info = {
-                **field_info,
-                "bsonType": "object",
-                "properties": value["properties"]
-            }
-            if "required" in value and len(value["required"]) > 0:
-                field_info["required"] = value["required"]
-
-        if value["bsonType"] == "array":
-            field_info = {
-                **field_info,
-                "bsonType": "array",
-                "items": value["items"]
-            }
-            if "required" in value and len(value["required"]) > 0:
-                field_info["required"] = value["required"]
-
-        return field_info
-
-    @classmethod
-    def _get_bson_properties(cls, properties: dict):
-        return {
-            field: cls._construct_field_info(field, value) \
-            for field, value in properties.items()
-        }
-
-    @classmethod
     def get_collection_name(cls):
         if cls._meta.default.refer_to != "Self":
             return cls._meta.default.refer_to
         return cls.__name__.lower() + "s"
 
     @classmethod
+    def _get_model_attrs(cls, raw_schema: dict, is_internal=True):
+        default_description = lambda field_name, type: "\'%s\' must be an \'%s\'" % (field_name, type)
+        resolver = jsonschema.RefResolver.from_schema(raw_schema)
+        attrs = {}
+        schema = {"bsonType": "object", "title": raw_schema["title"].strip()}
+
+        if "required" in raw_schema and len(raw_schema["required"]) > 0:
+            schema["required"] = raw_schema["required"]
+        if "title" in raw_schema:
+            schema["title"] = raw_schema["title"]
+
+        for key, value in raw_schema["properties"].items():
+            if value["bsonType"] == "array":
+                assert \
+                    not ("anyOf" in value["items"] or "allOf" in value["items"]),\
+                    "Multiple values for array are not supported yet."
+
+                resolved_ref = resolver.resolve(value["items"]["$ref"])[1]
+                attrs[key] = {
+                    "bsonType": value["bsonType"],
+                    "title": value["title"].strip(),
+                    "description": value.get(
+                        "description",
+                        default_description(key, value["bsonType"])
+                    ),
+                    "items": cls._get_model_attrs(resolved_ref, is_internal)
+                }
+            elif value["bsonType"] == "object":
+                assert \
+                    not (
+                        0 <= len(value.get("allOf", [])) > 1 or
+                        0 <= len(value.get("anyOf", [])) > 1
+                    ),\
+                    "Multiple values for objects are not supported yet."
+                
+                ref_field = None
+                if "allOf" in value:
+                    ref_field = value.pop("allOf")
+                elif "anyOf" in value:
+                    ref_field = value.pop("anyOf")
+
+                resolved_ref = resolver.resolve(ref_field[0]["$ref"])[1]
+                attrs[key] = {
+                    **cls._get_model_attrs(resolved_ref, is_internal),
+                    "description": value.get(
+                        "description",
+                        default_description(key, value["bsonType"])
+                    )
+                }
+            else:
+                attrs[key] = {
+                    "bsonType": value["bsonType"],
+                    "title": value["title"].strip(),
+                    "description": value.get(
+                        "description",
+                        default_description(key, value["bsonType"])
+                    ),
+                }
+
+            if not is_internal:
+                fields_needed = ["relation_type", "format", "type", "anyOf", "allOf", "title"]
+                for field in set(fields_needed).intersection(value):
+                    attrs[key][field] = value[field]
+
+        schema["properties"] = attrs
+        return schema
+
+    @classmethod
     def get_bson_schema(cls) -> tuple:
         model_schema = cls.model_json_schema()
-        schema = {
-            "$jsonSchema": {
-                "bsonType": "object",
-                "title": model_schema["title"],
-                "properties": cls._get_bson_properties(model_schema["properties"])
-            }
-        }
-        if "required" in model_schema and len(model_schema["required"]) > 0:
-            schema["$jsonSchema"]["required"] = model_schema["required"]
-
-        return cls.get_collection_name(), schema
+        return (
+            cls.get_collection_name(),
+            {"$jsonSchema": cls._get_model_attrs(model_schema)}
+        )
 
     @classmethod
     def get_model_name(cls):
@@ -129,6 +157,11 @@ class Model(ABC, BaseModel, metaclass=MetaModel):
         if not settings.SETTINGS_LOADED: raise SettingsNotLoaded
         return cls._conn[settings.DATABASE.get("name")][cls.get_collection_name()]
 
+    @classmethod
+    def dump_model_attributes(cls):
+        model_schema = cls.model_json_schema()
+        return cls._get_model_attrs(model_schema, False)
+
     def _get_excluded_fields(self, dump_all, fields):
         if dump_all: return None
         excluded_fields = fields.pop("exclude", []) or []
@@ -143,7 +176,7 @@ class Model(ABC, BaseModel, metaclass=MetaModel):
         excluded_fields = self._get_excluded_fields(dump_all, kwargs)
         return super().model_dump(by_alias=by_alias, *args, **kwargs, exclude=excluded_fields)
 
-    model_config = ConfigDict(arbitrary_types_allowed=True, populate_by_name=True, json_encoders={ObjectId: str})
+    model_config = ConfigDict(arbitrary_types_allowed=True, populate_by_name=True)
 
     def __str__(self) -> str:
         return f"<{self.get_model_name()} id='{self.id}'>"
