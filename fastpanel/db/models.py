@@ -172,11 +172,15 @@ class Model(ABC, BaseModel, metaclass=MetaModel):
         excluded_fields = self._get_excluded_fields(dump_all, kwargs)
         return super().model_dump_json(by_alias=by_alias, *args, **kwargs, exclude=excluded_fields)
 
-    def model_dump(self, dump_all: bool = False, by_alias: bool = True, *args, **kwargs) -> str:
+    def model_dump(self, dump_all: bool = False, by_alias: bool = True, *args, **kwargs) -> dict:
         excluded_fields = self._get_excluded_fields(dump_all, kwargs)
         return super().model_dump(by_alias=by_alias, *args, **kwargs, exclude=excluded_fields)
 
-    model_config = ConfigDict(arbitrary_types_allowed=True, populate_by_name=True)
+    model_config = ConfigDict(
+        arbitrary_types_allowed=True,
+        populate_by_name=True,
+        validate_assignment=True
+    )
 
     def __str__(self) -> str:
         return f"<{self.get_model_name()} id='{self.id}'>"

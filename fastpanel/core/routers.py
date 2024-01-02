@@ -123,7 +123,7 @@ async def create_objects(
     return model(**dumped_data)
 
 
-@router.patch("/models/objects/{object_id}", response_model=schemas.UpdateObject)
+@router.patch("/models/objects/{object_id}")
 async def update_object(
         object_id: str,
         payload: schemas.UpdateObject,
@@ -135,14 +135,22 @@ async def update_object(
 
     if "update" not in Model._meta.default.allowed_operations:
         raise exceptions.HTTPException(status.HTTP_403_FORBIDDEN, "Permission denied")
-    
-    if not ObjectId.is_valid(object_id):
-        raise exceptions.HTTPException(status.HTTP_400_BAD_REQUEST, "Invalid object id")
 
     collection = model.get_collection()
 
     try:
-        updated_document = await collection.find_one_and_update(
+        document = await collection.find_one({"_id": ObjectId(object_id)})
+        if not document:
+            raise exceptions.HTTPException(
+                status.HTTP_404_NOT_FOUND,
+                "Object not found"
+            )
+
+        document = model(**document)
+        for field_name in set(document.model_dump(True).keys()).intersection(payload.data.keys()):
+            setattr(document, field_name, payload.data[field_name])
+
+        document = await collection.find_one_and_update(
             {"_id": ObjectId(object_id)},
             {"$set": payload.data},
             return_document=ReturnDocument.AFTER
@@ -156,12 +164,7 @@ async def update_object(
                 "code": e.code if hasattr(e, "code") else None
             }
         )
-
-
-    if not updated_document:
-        raise exceptions.HTTPException(status.HTTP_404_NOT_FOUND, "Object not found")
-    
-    return {**payload.model_dump(), "data": model(**updated_document).model_dump()}
+    return model(**document)
 
 
 @router.delete("/models/objects/{object_id}", status_code=status.HTTP_204_NO_CONTENT)
