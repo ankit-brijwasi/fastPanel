@@ -3,9 +3,9 @@ from pathlib import Path
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from pydantic import FilePath
-import yaml
 
 from . import core
+from .utils import parse_config_file
 from .db.utils import get_db_client
 from .db.models import Model
 
@@ -29,12 +29,8 @@ async def init(
         mount_path: str = "/", conn = None
     ):
     # load settings
-    with open(config_file, 'r') as config:
-        config = yaml.safe_load(config)
-        if 'database' in config and 'name' not in config["database"]:
-            raise TypeError("Please pass the database name in the configuration")
-        
-        core.Setup.load_settings(**config)
+    config = parse_config_file(config_file)
+    core.Setup.load_settings(**config)
 
     if not conn: conn = get_db_client()
 
