@@ -1,11 +1,12 @@
+import json
 from abc import ABC
 
-import jsonschema
 from pydantic import BaseModel, ConfigDict, Field
 from pydantic._internal._model_construction import ModelMetaclass
 from motor.motor_asyncio import AsyncIOMotorCollection
 
-from .fields import PyObjectIdField, ObjectId
+from ..core.serializers import FastPanelJSONEncoder
+from .annotations import PyObjectId, ObjectId
 
 
 class MetaOptions:
@@ -50,7 +51,7 @@ class Model(ABC, BaseModel, metaclass=MetaModel):
     for database connection is attached to Model 
     """
 
-    id: PyObjectIdField = Field(
+    id: PyObjectId = Field(
         alias="_id",
         default_factory=lambda: ObjectId(),
         json_schema_extra={
@@ -67,68 +68,62 @@ class Model(ABC, BaseModel, metaclass=MetaModel):
 
     @classmethod
     def _get_model_attrs(cls, raw_schema: dict, is_internal=True):
+        from .utils import get_model_via_collection_name
         default_description = lambda field_name, type: "\'%s\' must be an \'%s\'" % (field_name, type)
-        resolver = jsonschema.RefResolver.from_schema(raw_schema)
         attrs = {}
         schema = {"bsonType": "object", "title": raw_schema["title"].strip()}
 
+        if not is_internal:
+            schema["hidden"] = cls._meta.default.hidden_fields
+
         if "required" in raw_schema and len(raw_schema["required"]) > 0:
             schema["required"] = raw_schema["required"]
+
         if "title" in raw_schema:
             schema["title"] = raw_schema["title"]
 
         for key, value in raw_schema["properties"].items():
+            model_fields = cls.model_fields.get(key)
             if value["bsonType"] == "array":
-                assert \
-                    not ("anyOf" in value["items"] or "allOf" in value["items"]),\
-                    "Multiple values for array are not supported yet."
+                related_to = getattr(model_fields, "json_schema_extra", {})["related_to"]
+                related_model = get_model_via_collection_name(related_to)
 
-                resolved_ref = resolver.resolve(value["items"]["$ref"])[1]
                 attrs[key] = {
                     "bsonType": value["bsonType"],
                     "title": value["title"].strip(),
-                    "description": value.get(
-                        "description",
-                        default_description(key, value["bsonType"])
-                    ),
-                    "items": cls._get_model_attrs(resolved_ref, is_internal)
+                    "description": value.get("description", default_description(key, value["bsonType"])),
+                    "items": related_model.dump_model_attributes()
                 }
-            elif value["bsonType"] == "object":
-                assert \
-                    not (
-                        0 <= len(value.get("allOf", [])) > 1 or
-                        0 <= len(value.get("anyOf", [])) > 1
-                    ),\
-                    "Multiple values for objects are not supported yet."
-                
-                ref_field = None
-                if "allOf" in value:
-                    ref_field = value.pop("allOf")
-                elif "anyOf" in value:
-                    ref_field = value.pop("anyOf")
 
-                resolved_ref = resolver.resolve(ref_field[0]["$ref"])[1]
+            elif value["bsonType"] == "object":
+                related_to = getattr(model_fields, "json_schema_extra", {})["related_to"]
+                related_model = get_model_via_collection_name(related_to)
+
                 attrs[key] = {
-                    **cls._get_model_attrs(resolved_ref, is_internal),
-                    "description": value.get(
-                        "description",
-                        default_description(key, value["bsonType"])
-                    )
+                    **related_model.dump_model_attributes(),
+                    "description": value.get("description", default_description(key, value["bsonType"]))
                 }
+
             else:
                 attrs[key] = {
                     "bsonType": value["bsonType"],
                     "title": value["title"].strip(),
-                    "description": value.get(
-                        "description",
-                        default_description(key, value["bsonType"])
-                    ),
+                    "description": value.get("description", default_description(key, value["bsonType"])),
                 }
 
             if not is_internal:
-                fields_needed = ["relation_type", "format", "type", "anyOf", "allOf", "title"]
+                fields_needed = ["relation_type", "format", "type", "title"]
+
+                if not value["bsonType"] in ["object", "array"]:
+                    fields_needed.extend(["anyOf", "allOf"])
+
                 for field in set(fields_needed).intersection(value):
                     attrs[key][field] = value[field]
+                
+                attrs[key]["frozen"] = bool(getattr(model_fields, "frozen", None))
+                attrs[key]["default"] = json.loads(
+                    json.dumps(getattr(model_fields, "default", None), cls=FastPanelJSONEncoder)
+                )
 
         schema["properties"] = attrs
         return schema

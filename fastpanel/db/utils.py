@@ -38,8 +38,22 @@ def get_db_client():
 
 def get_model(app_name: str = "fastpanel.core.accounts", model_name: str = "FastPanelUser") -> Model:
     from ..conf import settings
-    app: settings.InstalledApp = list(filter(lambda x: x.app_name == app_name, settings.INSTALLED_APPS))[0]
-    for model in app.models:
-        if model.__name__.lower().endswith(model_name.lower()):
-            return model
+    try:
+        app: settings.InstalledApp = list(filter(lambda x: x.app_name == app_name, settings.INSTALLED_APPS))[0]
+        for model in app.models:
+            if model.__name__.lower().endswith(model_name.lower()):
+                return model
+    except IndexError: pass
+    return None
+
+
+def get_model_via_collection_name(collection_name: str):
+    from ..conf import settings
+    def search(installed_app: settings.InstalledApp):
+        model = next(filter(lambda x: x.get_collection_name() == collection_name, installed_app.models), None)
+        return model
+
+    try:
+        return next(map(search, settings.INSTALLED_APPS), None)
+    except StopIteration: pass
     return None
