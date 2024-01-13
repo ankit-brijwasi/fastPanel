@@ -92,7 +92,7 @@ class Model(ABC, BaseModel, metaclass=MetaModel):
                     "bsonType": value["bsonType"],
                     "title": value["title"].strip(),
                     "description": value.get("description", default_description(key, value["bsonType"])),
-                    "items": related_model.dump_model_attributes()
+                    "items": related_model._get_model_attrs(related_model.model_json_schema(), is_internal)
                 }
 
             elif value["bsonType"] == "object":
@@ -100,7 +100,7 @@ class Model(ABC, BaseModel, metaclass=MetaModel):
                 related_model = get_model_via_collection_name(related_to)
 
                 attrs[key] = {
-                    **related_model.dump_model_attributes(),
+                    **related_model._get_model_attrs(related_model.model_json_schema(), is_internal),
                     "description": value.get("description", default_description(key, value["bsonType"]))
                 }
 
