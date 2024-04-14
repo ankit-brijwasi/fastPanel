@@ -6,7 +6,6 @@ from pydantic import FilePath
 
 from . import core
 from .utils import parse_config_file
-from .db.utils import get_db_client
 from .db.models import Model
 
 
@@ -30,15 +29,7 @@ async def init(
     ):
     # load settings
     config = parse_config_file(config_file)
-    core.Setup.load_settings(**config)
-
-    if not conn: conn = get_db_client()
-
-    # attach a reference of db and connection with the model
-    Model._conn = conn
-
-    # load models
-    await core.Setup.load_default_models(conn)
+    core.Setup.load_settings(db_connection=conn, **config)
 
     # load middlewares
     await core.Setup.load_middlewares(app)

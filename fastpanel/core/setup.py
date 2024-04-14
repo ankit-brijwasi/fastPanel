@@ -2,9 +2,9 @@ from typing import List
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from motor.motor_asyncio import AsyncIOMotorClient
 
 from ..conf import settings
+from ..db.utils import Model, get_db_client
 
 
 def load_cors_config(config):
@@ -38,6 +38,7 @@ class Setup:
         secret_key: str,
         apps: List[str] = [],
         models_lookup: str = None,
+        db_connection = None,
         **extra
     ):
         if models_lookup: settings.MODELS_LOOKUP = models_lookup
@@ -56,16 +57,18 @@ class Setup:
 
         settings.INSTALLED_APPS.extend([
             settings.InstalledApp("fastpanel.core.accounts", "models"),
-            settings.InstalledApp("fastpanel.core.auth", "models"),
-            settings.InstalledApp("fastpanel.core", "models"),
         ])
         settings.SECRET_KEY = secret_key
         settings.SETTINGS_LOADED = True
+
+        # set database connection reference to Model
+        if not db_connection: db_connection = get_db_client()
+        Model._conn = db_connection
+
         return settings
 
     @staticmethod
-    async def load_default_models(connection: AsyncIOMotorClient):
-        # TODO: This can be improved by moving it to a command line instead
+    async def load_models(connection):
         db = getattr(connection, settings.DATABASE["name"])
         models_available = await db.list_collection_names()
         missing_models = [

@@ -3,7 +3,6 @@ from abc import ABC
 
 from pydantic import BaseModel, ConfigDict, Field
 from pydantic._internal._model_construction import ModelMetaclass
-from motor.motor_asyncio import AsyncIOMotorCollection
 
 from ..core.serializers import FastPanelJSONEncoder
 from .annotations import PyObjectId, ObjectId
@@ -141,7 +140,7 @@ class Model(ABC, BaseModel, metaclass=MetaModel):
         return cls.__name__
     
     @classmethod
-    def get_collection(cls) -> AsyncIOMotorCollection:
+    def get_collection(cls):
         """
         Get the mongodb collection attached with this model
         raises error `SettingsNotLoaded` if called before loading settings
