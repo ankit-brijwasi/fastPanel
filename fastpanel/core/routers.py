@@ -9,6 +9,7 @@ from fastapi import (
     exceptions,
     Depends,
 )
+from pydantic import ValidationError
 from pymongo import ReturnDocument
 
 from . import schemas
@@ -25,7 +26,7 @@ router = APIRouter()
 @router.get("/fetch-models")
 def fetch_models(
         app_name: Optional[str] = None,
-        # _ = Depends(auth_required),
+        _ = Depends(auth_required),
     ):
     apps = settings.INSTALLED_APPS
     if app_name:
@@ -72,7 +73,7 @@ async def model_attributes(
 @router.get("/models/objects/{object_id}")
 async def retrieve_object(
     object_id: str, model: Model = Depends(get_model),
-    # _ = Depends(auth_required),
+    _ = Depends(auth_required),
 ):
     if not model:
         raise exceptions.HTTPException(status.HTTP_404_NOT_FOUND, "Model not found")
@@ -96,7 +97,7 @@ async def retrieve_object(
 @router.post("/models/objects/")
 async def create_objects(
         payload: schemas.CreateObject,
-        # _ = Depends(auth_required),
+        _ = Depends(auth_required),
     ):
     model = get_model(payload.app, payload.model)
     if not model:
@@ -105,7 +106,10 @@ async def create_objects(
     if "post" not in Model._meta.default.allowed_operations:
         raise exceptions.HTTPException(status.HTTP_403_FORBIDDEN, "Permission denied")
 
-    model_obj: Model = model(**payload.data)
+    try:
+        model_obj: Model = model(**payload.data)
+    except ValidationError as e:
+        raise exceptions.HTTPException(422, {"count": e.error_count(), "errors": e.errors()})
     collection = model.get_collection()
 
     try:
@@ -127,7 +131,7 @@ async def create_objects(
 async def update_object(
         object_id: str,
         payload: schemas.UpdateObject,
-        # _ = Depends(auth_required),
+        _ = Depends(auth_required),
     ):
     model = get_model(payload.app, payload.model)
     if not model:
@@ -146,7 +150,11 @@ async def update_object(
                 "Object not found"
             )
 
-        document = model(**document)
+        try:
+            document = model(**document)
+        except ValidationError as e:
+            raise exceptions.HTTPException(422, {"count": e.error_count(), "errors": e.errors()})
+
         for field_name in set(document.model_dump(True).keys()).intersection(payload.data.keys()):
             setattr(document, field_name, payload.data[field_name])
 
