@@ -28,7 +28,7 @@ setup(
         "python-multipart>=0.0.6",
         "pytz>=2023.3.post1",
         "passlib>=1.7.4",
-        "bcrypt>=4.0.1",
+        "bcrypt==4.0.1",
         "jsonschema>=4.20.0",
         "click>=8.1.7"
     ],
