@@ -19,12 +19,12 @@ pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 
 def verify_password(plain_password: str, hashed_password: str):
-    # return pwd_context.verify(plain_password, hashed_password)
-    return True
+    return pwd_context.verify(plain_password, hashed_password.strip("fpanel_hash_"))
 
 
 def get_password_hash(password: str):
-    return pwd_context.hash(password)
+    hashed_string = pwd_context.hash(password)
+    return "fpanel_hash_" + hashed_string
 
 
 def create_token(data: Union[str, dict], expiry: datetime):

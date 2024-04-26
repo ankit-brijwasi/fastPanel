@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Optional
 
-from pydantic import Field, EmailStr
+from pydantic import Field, EmailStr, field_validator
 
 from ...db.models import Model
 from ...utils import timezone
@@ -63,6 +63,15 @@ class FastPanelUser(Model):
         },
         default=True
     )
+
+    @field_validator("password")
+    @classmethod
+    def make_password(cls, password: str) -> str:
+        if password.startswith("fpanel_hash_"):
+            return password
+        else:
+            from ..auth.utils import get_password_hash
+            return get_password_hash(password)
 
     class Meta:
         indexes = [
