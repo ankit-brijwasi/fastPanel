@@ -1,3 +1,4 @@
+import logging
 from pathlib import Path
 
 from fastapi import FastAPI
@@ -11,6 +12,7 @@ from .db.models import Model
 
 FRONTEND_DIR = Path(__file__).parent / "preact-app" / "fast-panel"
 app = FastAPI()
+logger = logging.getLogger("uvicorn")
 
 
 # middleware to check whether settings are loaded or not
@@ -27,6 +29,7 @@ async def init(
         config_file: FilePath, root_app: FastAPI,
         mount_path: str = "/", conn = None
     ):
+    logger.info("Mounting Fastpanel")
     # load settings
     config = parse_config_file(config_file)
     core.Setup.load_settings(db_connection=conn, **config)
@@ -42,6 +45,7 @@ async def init(
 
     # mount the root application
     root_app.mount("/fastpanel", app, name="FastPanel")
+    logger.info(f"Mounted Fastpanel successfully! visit the /fastpanel{mount_path} route to view it!")
 
 
 async def deinit():

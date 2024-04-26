@@ -1,3 +1,4 @@
+import logging
 from typing import List
 
 from fastapi import FastAPI
@@ -5,6 +6,9 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from ..conf import settings
 from ..db.utils import Model, get_db_client
+
+
+logger = logging.getLogger("uvicorn")
 
 
 def load_cors_config(config):
@@ -42,6 +46,7 @@ class Setup:
         **extra
     ):
         if models_lookup: settings.MODELS_LOOKUP = models_lookup
+        if not apps: apps = []
 
         # load the apps and models
         for app_name in apps:
@@ -81,12 +86,12 @@ class Setup:
         ]
 
         for model in missing_models:
-            print(f"installing {model.get_collection_name()} model...")
+            logger.info(f"installing {model.get_collection_name()} model...")
             collection_name, validation_schema = model.get_bson_schema()
             await db.create_collection(collection_name, validator=validation_schema)
 
             for index in model._meta.default.indexes:
-                print("adding index:", index)
+                logger.info(f"adding index: {index}")
                 await db[collection_name].create_index(**index)
 
     @staticmethod
