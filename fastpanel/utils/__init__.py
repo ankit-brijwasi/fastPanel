@@ -1,1 +1,1 @@
-from .helpers import parse_config_file
+from .helpers import parse_config_file, setup_frontend

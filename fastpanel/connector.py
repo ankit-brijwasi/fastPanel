@@ -6,13 +6,13 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import FilePath
 
 from . import core
-from .utils import parse_config_file
+from .utils import parse_config_file, setup_frontend
 from .db.models import Model
 
 
-FRONTEND_DIR = Path(__file__).parent / "preact-app" / "fast-panel"
 app = FastAPI()
 logger = logging.getLogger("uvicorn")
+
 
 
 # middleware to check whether settings are loaded or not
@@ -30,6 +30,7 @@ async def init(
         mount_path: str = "/", conn = None
     ):
     logger.info("Mounting Fastpanel")
+
     # load settings
     config = parse_config_file(config_file)
     core.Setup.load_settings(db_connection=conn, **config)
@@ -37,6 +38,9 @@ async def init(
     # load middlewares
     await core.Setup.load_middlewares(app)
     await core.Setup.load_models(Model._conn)
+
+    # load frontend
+    FRONTEND_DIR = setup_frontend(Path(__file__).parent / "preact-app" / "fast-panel")
 
     app.include_router(core.auth_router, prefix="/auth", tags=["Auth"])
     app.include_router(core.accounts_router, prefix="/accounts", tags=["Account"])
