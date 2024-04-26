@@ -61,29 +61,29 @@ def createuser(ctx, username: str, email: str, first_name: str, last_name: str):
     asyncio.run(push_data(collection, user.model_dump(True)))
 
 
-@cli.command()
-@click.pass_context
-def inspect(ctx):
-    """
-    Inspect the models which are installed in the database
-    and which are yet to be installed.
-    """
-    pass
+# @cli.command()
+# @click.pass_context
+# def inspect(ctx):
+#     """
+#     Inspect the models which are installed in the database
+#     and which are yet to be installed.
+#     """
+#     pass
 
 
-@cli.command()
-@click.pass_context
-def install(ctx, no_input: bool = False):
-    """
-    Register models to the database
-    Tip: Make sure that the `__init__.py` file is present in your app
-    otherwise it may fail to locate your `models`
-    """
-    config = parse_config_file(ctx.obj["config_file"])
-    Setup.load_settings(**config)
+# @cli.command()
+# @click.pass_context
+# def install(ctx):
+#     """
+#     Register models to the database
+#     Tip: Make sure that the `__init__.py` file is present in your app
+#     otherwise it may fail to locate your `models`
+#     """
+#     config = parse_config_file(ctx.obj["config_file"])
+#     Setup.load_settings(**config)
 
-    from .db.models import Model
-    asyncio.run(Setup.load_models(Model._conn))
+#     from .db.models import Model
+#     asyncio.run(Setup.load_models(Model._conn))
 
 
 if __name__ == '__main__':
