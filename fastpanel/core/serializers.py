@@ -19,6 +19,14 @@ class FastPanelJSONEncoder(json.JSONEncoder):
         if isinstance(o, InstalledApp):
             return {
                 "app_name": o.app_name,
-                "models": [{"name": model.__name__} for model in o.models]
+                "models": [
+                    {
+                        "name": model.__name__,
+                        "meta": {
+                            "is_nested": model._meta.default.is_nested,
+                            "search_fields": model._meta.default.search_fields
+                        }
+                    } for model in o.models
+                ]
             }
         return json.JSONEncoder.default(self, o)
