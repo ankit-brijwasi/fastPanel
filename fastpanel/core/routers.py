@@ -23,7 +23,7 @@ from ..db.utils import get_model
 router = APIRouter()
 
 
-@router.get("/fetch-models")
+@router.get("/fetch-apps")
 def fetch_models(
         app_name: Optional[str] = None,
         _ = Depends(auth_required),
@@ -43,7 +43,7 @@ def fetch_models(
 @router.get("/models/objects/")
 async def list_objects(
     model: Model = Depends(get_model),
-    # _ = Depends(auth_required)
+    _ = Depends(auth_required)
 ):
     if not model:
         raise exceptions.HTTPException(status.HTTP_404_NOT_FOUND, "Model not found")
@@ -59,7 +59,7 @@ async def list_objects(
 @router.get("/models/objects/attributes")
 async def model_attributes(
     model: Model = Depends(get_model),
-    # _ = Depends(auth_required)
+    _ = Depends(auth_required)
 ):
     if not model:
         raise exceptions.HTTPException(status.HTTP_404_NOT_FOUND, "Model not found")
@@ -105,6 +105,10 @@ async def create_objects(
 
     if "post" not in Model._meta.default.allowed_operations:
         raise exceptions.HTTPException(status.HTTP_403_FORBIDDEN, "Permission denied")
+
+    # TODO: Commenting for now, will turn on this check after proper testing
+    # if model._meta.default.is_nested:
+    #     raise exceptions.HTTPException(status.HTTP_403_FORBIDDEN, "Model is nested! Permission deined")
 
     try:
         model_obj: Model = model(**payload.data)
@@ -179,7 +183,7 @@ async def update_object(
 async def delete_object(
         object_id: str,
         model:Model = Depends(get_model),
-        # _ = Depends(auth_required)
+        _ = Depends(auth_required)
     ):
     if not model:
         raise exceptions.HTTPException(status.HTTP_404_NOT_FOUND, "Model not found")
@@ -215,7 +219,7 @@ async def delete_object(
 @router.get("/models/objects/search/fields")
 async def get_search_fields(
         model: Model = Depends(get_model),
-        # _ = Depends(auth_required)
+        _ = Depends(auth_required)
     ):
     if not model:
         raise exceptions.HTTPException(status.HTTP_404_NOT_FOUND, "Model not found")
@@ -229,7 +233,7 @@ async def get_search_fields(
 @router.post("/models/objects/search")
 async def search(
         payload: schemas.SearchObject,
-        # _ = Depends(auth_required)
+        _ = Depends(auth_required)
     ):
     model: Model = get_model(payload.app, payload.model)
     if not model:
