@@ -12,23 +12,23 @@ class MetaOptions:
     def __init__(
         self,
         parent,
-        allowed_operations=None,
-        search_fields=None,
-        filter_fields=None,
-        indexes=None,
+        allowed_operations=["get", "post", "update", "delete"],
+        search_fields=["_id"],
+        indexes=[],
         refer_to= "Self",
-        hidden_fields=None,
+        hidden_fields=[],
         is_nested=False,
+        install_model=True,
         **options
     ):
         self.parent = parent
-        self.allowed_operations = allowed_operations or ["get", "post", "update", "delete"]
-        self.filter_fields = filter_fields or []
-        self.indexes = indexes or []
-        self.refer_to = refer_to or "Self"
-        self.hidden_fields = hidden_fields or []
-        self.search_fields = search_fields or ["_id"]
+        self.allowed_operations = allowed_operations
+        self.indexes = indexes
+        self.refer_to = refer_to
+        self.hidden_fields = hidden_fields
+        self.search_fields = search_fields
         self.is_nested = is_nested
+        self.install_model = install_model
     
     def __repr__(self) -> str:
         return "<MetaOptions parent='%s' is_nested='%s'>" % (self.parent, self.is_nested)

@@ -33,6 +33,7 @@ async def init(
 
     # load middlewares
     await core.Setup.load_middlewares(app)
+    await core.Setup.load_models(Model._conn)
 
     app.include_router(core.auth_router, prefix="/auth", tags=["Auth"])
     app.include_router(core.accounts_router, prefix="/accounts", tags=["Account"])
