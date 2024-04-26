@@ -38,3 +38,13 @@ def EmbdedField(
             "related_to": related_to.get_collection_name()
         }
     )
+
+
+@validate_call
+def RefrenceField(
+        related_to: Type[Model],
+        reference_type: Literal['one-to-many', 'many-to-many'] = "one-to-many",
+        *args,
+        **kwargs
+    ):
+    raise NotImplementedError("Field support wull be added soon")
