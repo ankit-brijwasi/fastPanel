@@ -6,3 +6,4 @@ posts
 fastpanel.yaml
 dist
 *.egg-info
+static
